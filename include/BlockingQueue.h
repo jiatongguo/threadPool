@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <mutex>
 #include <queue>
+#include <utility>
 namespace tp {
 template<typename T>
 class BlockingQueue
@@ -22,5 +23,71 @@ private:
     std::condition_variable not_empty_; // 可以pop
     std::condition_variable not_full_; // 可以push
 };
+
+template<typename T>
+bool BlockingQueue<T>::push(const T& value) 
+{
+    std::unique_lock<std::mutex> lock(mtx_);
+    not_full_.wait(lock, [this]
+            { return closed_ || q_.size() < cap_ ;});
+ 
+    if (closed_)
+    {
+        return false;
+    }
+
+    q_.push(value);
+    not_empty_.notify_one();
+
+    return true;
+}
+
+template<typename T>
+bool BlockingQueue<T>::push(T&& value)
+{
+    std::unique_lock<std::mutex> lock(mtx_);
+    not_full_.wait(lock, [this]
+            { return closed_ || q_.size() < cap_ ;});
+ 
+    if (closed_)
+    {
+        return false;
+    }
+
+    q_.push(std::move(value));
+    not_empty_.notify_one();
+    
+    return true;
+}
+
+template<typename T>
+bool BlockingQueue<T>::pop(T& out) 
+{
+    std::unique_lock<std::mutex> lock(mtx_);
+    not_empty_.wait(lock, [this] 
+        { return closed_ || !q_.empty(); });
+    
+    if (closed_ && q_.empty())
+    {
+        return false;
+    }
+
+    out = q_.front();
+    q_.pop();
+
+    not_full_.notify_one();
+
+    return true;
+}
+
+template<typename T>
+void BlockingQueue<T>::close() 
+{
+    std::lock_guard<std::mutex> lock(mtx_);
+    closed_ = true;
+
+    not_empty_.notify_all();
+    not_full_.notify_all();
+}
 
 }
