@@ -1,0 +1,2 @@
+add_executable(threadpool_tests test.cpp)
+target_link_libraries(threadpool_tests)
