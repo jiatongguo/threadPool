@@ -5,4 +5,4 @@ set(CMAKE_CXX_STANDARD 17)
 
 include_directories(include)
 
-add_executable(threadpool src/main.cpp src/ThreadPool.cpp)
+add_executable(threadpool src/main.cpp src/ThreadPool.cpp src/BlockingQueue.cpp)
