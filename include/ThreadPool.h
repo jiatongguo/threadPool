@@ -1,9 +1,7 @@
 #include "BlockingQueue.h"
-#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <future>
-#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
@@ -16,6 +14,12 @@ namespace tp {
 class ThreadPool
 {
 public:
+    enum class ShutdownMode
+    {
+        Graceful,
+        Immediate
+    };
+
     explicit ThreadPool(std::size_t numsThread, std::size_t cap) 
     : task_queue_(cap)
     {
@@ -30,16 +34,7 @@ public:
 
     ~ThreadPool()
     {
-        stop_.store(true);
-        task_queue_.close();
-
-        for (auto& worker : workers_)
-        {
-            if (worker.joinable())
-            {
-                worker.join();
-            }
-        }
+        shutdown();
     }
     
     // 返回结果给调用方
@@ -65,12 +60,45 @@ public:
         return fut;
     }
 
+    void shutdown(ShutdownMode mode = ShutdownMode::Graceful)
+    {
+        bool expected = false;
+        if (!stop_.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
+        {
+            return;
+        }
+
+        if (mode == ShutdownMode::Immediate)
+        {
+            immediate_stop_.store(true, std::memory_order_release);
+        }
+
+        task_queue_.close();
+        if (mode == ShutdownMode::Immediate)
+        {
+            task_queue_.clear();
+        }
+
+        for (auto& worker : workers_)
+        {
+            if (worker.joinable())
+            {
+                worker.join();
+            }
+        }
+    }
+
 private:
     void worker_loop() noexcept
     {
         std::function<void()> task;
-        while (!stop_ && task_queue_.pop(task)) 
+        while (task_queue_.pop(task))
         {
+            if (immediate_stop_.load(std::memory_order_acquire))
+            {
+                continue;
+            }
+
             try
             {
                 task();
@@ -85,6 +113,7 @@ private:
     std::vector<std::thread> workers_;
     BlockingQueue<std::function<void()>> task_queue_;
     std::atomic<bool> stop_ {false};
+    std::atomic<bool> immediate_stop_ {false};
 };
 
 }

@@ -14,6 +14,7 @@ public:
     bool push(T&& value);
     bool pop(T& out);
     void close();
+    void clear();
     
 private:
     std::queue<T> q_;
@@ -87,6 +88,17 @@ void BlockingQueue<T>::close()
     closed_ = true;
 
     not_empty_.notify_all();
+    not_full_.notify_all();
+}
+
+template<typename T>
+void BlockingQueue<T>::clear()
+{
+    std::lock_guard<std::mutex> lock(mtx_);
+    while (!q_.empty())
+    {
+        q_.pop();
+    }
     not_full_.notify_all();
 }
 
