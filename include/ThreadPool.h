@@ -1,7 +1,12 @@
 #include "BlockingQueue.h"
+#include <cmath>
 #include <cstddef>
 #include <functional>
+#include <future>
 #include <iterator>
+#include <memory>
+#include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <vector>
 #include <thread>
@@ -37,9 +42,19 @@ public:
         }
     }
     
-    void enqueue(std::function<void()> task)
+    // 返回结果给调用方
+    template<class F, class... Args>
+    auto submit(F&& f, Args&&... args) -> std::future<std::invoke_result_t<F, Args...>>
     {
-        task_queue_.push(std::move(task));
+        using ReturnType = std::invoke_result_t<F, Args...>;
+    
+        auto bound = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
+        auto task = std::make_shared<std::packaged_task<ReturnType()>>(std::move(bound));
+        std::future<ReturnType> fut = task->get_future();
+        
+        task_queue_.push( [task]() { (*task)(); } );
+
+        return fut;
     }
 
 private:
