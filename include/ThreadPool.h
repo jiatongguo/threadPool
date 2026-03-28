@@ -46,13 +46,21 @@ public:
     template<class F, class... Args>
     auto submit(F&& f, Args&&... args) -> std::future<std::invoke_result_t<F, Args...>>
     {
+        if (stop_.load(std::memory_order_acquire))
+        {
+            throw std::runtime_error("线程池已关闭");
+        }
+
         using ReturnType = std::invoke_result_t<F, Args...>;
     
         auto bound = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
         auto task = std::make_shared<std::packaged_task<ReturnType()>>(std::move(bound));
         std::future<ReturnType> fut = task->get_future();
         
-        task_queue_.push( [task]() { (*task)(); } );
+        if (!task_queue_.push( [task]() { (*task)(); } ) )
+        {
+            throw std::runtime_error("任务队列已关闭");
+        }
 
         return fut;
     }
