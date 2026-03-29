@@ -5,6 +5,7 @@
 #include <atomic>
 #include <future>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -43,6 +44,56 @@ TEST(ThreadPoolTest, ExecutesAllSubmittedTasks)
     }
 
     EXPECT_EQ(sum.load(std::memory_order_relaxed), 136);
+}
+
+TEST(ThreadPoolTest, MultipleProducersSubmitConcurrently)
+{
+    tp::ThreadPool pool(4, 32);
+    constexpr int producer_count = 4;
+    constexpr int tasks_per_producer = 25;
+    constexpr int total_tasks = producer_count * tasks_per_producer;
+    std::promise<void> start;
+    auto start_future = start.get_future().share();
+    std::vector<std::thread> producers;
+    std::vector<std::vector<std::future<int>>> futures(producer_count);
+
+    for (int producer = 0; producer < producer_count; ++producer)
+    {
+        producers.emplace_back([&, producer] {
+            start_future.wait();
+            futures[producer].reserve(tasks_per_producer);
+
+            for (int task = 0; task < tasks_per_producer; ++task)
+            {
+                const int submission_id = producer * tasks_per_producer + task;
+                futures[producer].push_back(pool.submit([submission_id] {
+                    return submission_id;
+                }));
+            }
+        });
+    }
+
+    start.set_value();
+
+    for (auto& producer : producers)
+    {
+        producer.join();
+    }
+
+    std::vector<int> seen(total_tasks, 0);
+
+    for (auto& producer_futures : futures)
+    {
+        for (auto& future : producer_futures)
+        {
+            ++seen[future.get()];
+        }
+    }
+
+    for (int count : seen)
+    {
+        EXPECT_EQ(count, 1);
+    }
 }
 
 TEST(ThreadPoolTest, ShutdownRejectsNewTasks)
@@ -130,6 +181,72 @@ TEST(ThreadPoolTest, ShutdownIsIdempotent)
 
     pool.shutdown();
     EXPECT_NO_THROW(pool.shutdown(tp::ThreadPool::ShutdownMode::Immediate));
+}
+
+TEST(ThreadPoolTest, ShutdownRejectsBlockedConcurrentSubmitters)
+{
+    tp::ThreadPool pool(1, 1);
+    std::promise<void> first_started;
+    std::promise<void> release_first;
+    std::promise<void> shutdown_started;
+    std::atomic<bool> second_ran {false};
+    auto first_started_future = first_started.get_future();
+    auto release_first_future = release_first.get_future().share();
+    auto shutdown_started_future = shutdown_started.get_future();
+
+    auto first = pool.submit([&] {
+        first_started.set_value();
+        release_first_future.wait();
+    });
+
+    auto second = pool.submit([&] {
+        second_ran.store(true, std::memory_order_release);
+    });
+
+    EXPECT_EQ(first_started_future.wait_for(500ms), std::future_status::ready);
+
+    std::vector<std::future<bool>> submitters;
+    for (int i = 0; i < 4; ++i)
+    {
+        submitters.push_back(std::async(std::launch::async, [&pool] {
+            try
+            {
+                auto submitted = pool.submit([] { return 1; });
+                submitted.get();
+                return true;
+            }
+            catch (const std::runtime_error&)
+            {
+                return false;
+            }
+        }));
+    }
+
+    for (auto& submitter : submitters)
+    {
+        EXPECT_EQ(submitter.wait_for(100ms), std::future_status::timeout);
+    }
+
+    auto shutdown_done = std::async(std::launch::async, [&pool, &shutdown_started] {
+        shutdown_started.set_value();
+        pool.shutdown(tp::ThreadPool::ShutdownMode::Graceful);
+    });
+
+    EXPECT_EQ(shutdown_started_future.wait_for(500ms), std::future_status::ready);
+    EXPECT_EQ(shutdown_done.wait_for(0ms), std::future_status::timeout);
+
+    for (auto& submitter : submitters)
+    {
+        EXPECT_EQ(submitter.wait_for(500ms), std::future_status::ready);
+        EXPECT_FALSE(submitter.get());
+    }
+
+    release_first.set_value();
+
+    first.get();
+    second.get();
+    EXPECT_EQ(shutdown_done.wait_for(500ms), std::future_status::ready);
+    EXPECT_TRUE(second_ran.load(std::memory_order_acquire));
 }
 
 TEST(ThreadPoolTest, GracefulShutdownCompletesQueuedTasks)
