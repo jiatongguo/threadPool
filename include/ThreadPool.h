@@ -1,3 +1,5 @@
+#pragma once
+
 #include "BlockingQueue.h"
 #include <cstddef>
 #include <functional>
@@ -95,7 +97,7 @@ private:
         while (task_queue_.pop(task))
         {
             // Immediate 模式下，丢弃已出队但尚未执行的任务
-            if(immediate_stop_.load(std::memory_order_acquire))
+            if (immediate_stop_.load(std::memory_order_acquire))
             {
                 break;
             }
