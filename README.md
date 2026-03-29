@@ -86,9 +86,29 @@ int main()
 - `Graceful`: stop accepting new tasks and finish queued work
 - `Immediate`: stop accepting new tasks and discard queued work as soon as possible
 
+## Design Choices
+
+- The core implementation is header-only and lives in `include/ThreadPool.h` and `include/BlockingQueue.h`
+- `submit()` returns `std::future`, and exceptions thrown by tasks are observed through `future.get()`
+- `shutdown()` is idempotent; repeated calls after the first one are ignored
+- The destructor performs a graceful shutdown by default
+
+## Behavior Contract
+
+- Constructing `ThreadPool` with `numsThread == 0` throws `std::invalid_argument`
+- Constructing `ThreadPool` with `cap == 0` throws `std::invalid_argument`
+- Constructing `BlockingQueue` with `cap == 0` throws `std::invalid_argument`
+- Calling `submit()` after shutdown throws `std::runtime_error`
+- `Immediate` shutdown may discard tasks that are still queued and have not started running
+- `Graceful` shutdown waits for the running task and queued tasks to finish before returning
+
+## Limitations
+
+- A task that has already started running is not forcefully cancelled by `Immediate` shutdown
+- The current implementation is intended for in-process use and does not provide dynamic resizing or task prioritization
+- Error messages are fixed string literals and are not localized or structured
+
 ## Notes
 
-- Calling `submit()` after shutdown throws `std::runtime_error`
 - Pushing into a closed queue fails
-- Exceptions thrown by tasks are handled through `std::packaged_task` and the returned `std::future`
 - CI builds the project and runs `ctest` on every push and pull request
