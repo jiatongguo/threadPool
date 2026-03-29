@@ -147,6 +147,36 @@ TEST(ThreadPoolTest, MultipleProducersSubmitConcurrently)
     }
 }
 
+TEST(ThreadPoolTest, RepeatedCreateSubmitAndDestroyRemainsStable)
+{
+    constexpr int round_count = 40;
+    constexpr int tasks_per_round = 64;
+    std::atomic<int> completed {0};
+
+    for (int round = 0; round < round_count; ++round)
+    {
+        {
+            tp::ThreadPool pool(4, 64);
+            std::vector<std::future<void>> futures;
+            futures.reserve(tasks_per_round);
+
+            for (int task = 0; task < tasks_per_round; ++task)
+            {
+                futures.push_back(pool.submit([&completed] {
+                    completed.fetch_add(1, std::memory_order_relaxed);
+                }));
+            }
+
+            for (auto& future : futures)
+            {
+                future.get();
+            }
+        }
+    }
+
+    EXPECT_EQ(completed.load(std::memory_order_relaxed), round_count * tasks_per_round);
+}
+
 TEST(ThreadPoolTest, ShutdownRejectsNewTasks)
 {
     // Once shutdown starts, submit() should fail immediately for new work.
