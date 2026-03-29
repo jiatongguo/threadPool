@@ -24,6 +24,21 @@ TEST(ThreadPoolTest, SubmitReturnsFutureResult)
     EXPECT_EQ(result.get(), 3);
 }
 
+TEST(ThreadPoolTest, RejectsZeroWorkerCount)
+{
+    EXPECT_THROW(tp::ThreadPool(0, 1), std::invalid_argument);
+}
+
+TEST(ThreadPoolTest, RejectsZeroQueueCapacity)
+{
+    EXPECT_THROW(tp::ThreadPool(1, 0), std::invalid_argument);
+}
+
+TEST(BlockingQueueTest, RejectsZeroCapacity)
+{
+    EXPECT_THROW(tp::BlockingQueue<int>(0), std::invalid_argument);
+}
+
 TEST(ThreadPoolTest, ExecutesAllSubmittedTasks)
 {
     // Multiple tasks should all run exactly once even when workers consume them concurrently.

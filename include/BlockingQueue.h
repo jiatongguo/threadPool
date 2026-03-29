@@ -4,13 +4,20 @@
 #include <cstddef>
 #include <mutex>
 #include <queue>
+#include <stdexcept>
 #include <utility>
 namespace tp {
 template<typename T>
 class BlockingQueue
 {
 public:
-    explicit BlockingQueue(std::size_t cap) : cap_(cap) {}
+    explicit BlockingQueue(std::size_t cap) : cap_(cap)
+    {
+        if (cap_ == 0)
+        {
+            throw std::invalid_argument("队列容量必须大于0");
+        }
+    }
 
     bool push(const T& value);
     bool push(T&& value);

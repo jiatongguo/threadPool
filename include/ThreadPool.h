@@ -25,6 +25,11 @@ public:
     explicit ThreadPool(std::size_t numsThread, std::size_t cap) 
     : task_queue_(cap)
     {
+        if (numsThread == 0)
+        {
+            throw std::invalid_argument("线程数量必须大于0");
+        }
+
         for (std::size_t i = 0; i < numsThread; ++i) 
         {
             workers_.emplace_back([this] 
