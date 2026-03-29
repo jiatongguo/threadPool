@@ -16,10 +16,11 @@ A simple C++ thread pool implementation built on top of a bounded blocking queue
 - `include/ThreadPool.h`: thread pool interface and worker loop
 - `src/`: executable entry files
 - `test/`: test-related files
+- `.github/workflows/`: CI configuration
 
 ## Requirements
 
-- CMake 3.10 or newer
+- CMake 3.14 or newer
 - A C++17 compiler
 
 ## Build
@@ -29,10 +30,32 @@ cmake -S . -B build
 cmake --build build
 ```
 
-The current top-level CMake target builds:
+Run the demo executable:
 
 ```bash
 ./build/threadpool
+```
+
+## Test
+
+Build with tests enabled and run all tests:
+
+```bash
+cmake -S . -B build -DBUILD_TESTING=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Run the GoogleTest binary directly:
+
+```bash
+./build/test/threadpool_tests
+```
+
+Run a single test case:
+
+```bash
+./build/test/threadpool_tests --gtest_filter=ThreadPoolTest.ImmediateShutdownDiscardsQueuedTasks
 ```
 
 ## Usage
@@ -66,3 +89,4 @@ int main()
 - Calling `submit()` after shutdown throws `std::runtime_error`
 - Pushing into a closed queue fails
 - Exceptions thrown by tasks are handled through `std::packaged_task` and the returned `std::future`
+- CI builds the project and runs `ctest` on every push and pull request
