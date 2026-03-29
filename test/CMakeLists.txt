@@ -14,8 +14,7 @@ if(NOT GTest_FOUND)
 endif()
 
 add_executable(threadpool_tests test.cpp)
-target_include_directories(threadpool_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(threadpool_tests PRIVATE GTest::gtest_main Threads::Threads)
+target_link_libraries(threadpool_tests PRIVATE threadpool_headers GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(threadpool_tests)

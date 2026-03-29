@@ -30,6 +30,8 @@ cmake -S . -B build
 cmake --build build
 ```
 
+The project defines a header-only library target `threadpool_headers` and a demo executable `threadpool`.
+
 Run the demo executable:
 
 ```bash
