@@ -26,17 +26,53 @@ TEST(ThreadPoolTest, SubmitReturnsFutureResult)
 
 TEST(ThreadPoolTest, RejectsZeroWorkerCount)
 {
-    EXPECT_THROW(tp::ThreadPool(0, 1), std::invalid_argument);
+    try
+    {
+        (void)tp::ThreadPool(0, 1);
+        FAIL() << "Expected std::invalid_argument";
+    }
+    catch (const std::invalid_argument& ex)
+    {
+        EXPECT_STREQ(ex.what(), "线程数量必须大于0");
+    }
+    catch (...)
+    {
+        FAIL() << "Expected std::invalid_argument";
+    }
 }
 
 TEST(ThreadPoolTest, RejectsZeroQueueCapacity)
 {
-    EXPECT_THROW(tp::ThreadPool(1, 0), std::invalid_argument);
+    try
+    {
+        (void)tp::ThreadPool(1, 0);
+        FAIL() << "Expected std::invalid_argument";
+    }
+    catch (const std::invalid_argument& ex)
+    {
+        EXPECT_STREQ(ex.what(), "任务队列容量必须大于0");
+    }
+    catch (...)
+    {
+        FAIL() << "Expected std::invalid_argument";
+    }
 }
 
 TEST(BlockingQueueTest, RejectsZeroCapacity)
 {
-    EXPECT_THROW(tp::BlockingQueue<int>(0), std::invalid_argument);
+    try
+    {
+        (void)tp::BlockingQueue<int>(0);
+        FAIL() << "Expected std::invalid_argument";
+    }
+    catch (const std::invalid_argument& ex)
+    {
+        EXPECT_STREQ(ex.what(), "任务队列容量必须大于0");
+    }
+    catch (...)
+    {
+        FAIL() << "Expected std::invalid_argument";
+    }
 }
 
 TEST(ThreadPoolTest, ExecutesAllSubmittedTasks)
@@ -118,7 +154,19 @@ TEST(ThreadPoolTest, ShutdownRejectsNewTasks)
 
     pool.shutdown();
 
-    EXPECT_THROW(pool.submit([] { return 1; }), std::runtime_error);
+    try
+    {
+        (void)pool.submit([] { return 1; });
+        FAIL() << "Expected std::runtime_error";
+    }
+    catch (const std::runtime_error& ex)
+    {
+        EXPECT_STREQ(ex.what(), "线程池已停止接收新任务");
+    }
+    catch (...)
+    {
+        FAIL() << "Expected std::runtime_error";
+    }
 }
 
 TEST(ThreadPoolTest, TaskExceptionsReachFuture)

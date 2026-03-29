@@ -13,6 +13,9 @@
 #include <atomic>
 
 namespace tp {
+inline constexpr char kInvalidThreadCountMessage[] = "线程数量必须大于0";
+inline constexpr char kSubmitRejectedMessage[] = "线程池已停止接收新任务";
+
 class ThreadPool
 {
 public:
@@ -27,7 +30,7 @@ public:
     {
         if (numsThread == 0)
         {
-            throw std::invalid_argument("线程数量必须大于0");
+            throw std::invalid_argument(kInvalidThreadCountMessage);
         }
 
         for (std::size_t i = 0; i < numsThread; ++i) 
@@ -50,7 +53,7 @@ public:
     {
         if (stop_.load(std::memory_order_acquire))
         {
-            throw std::runtime_error("线程池已关闭");
+            throw std::runtime_error(kSubmitRejectedMessage);
         }
 
         using ReturnType = std::invoke_result_t<F, Args...>;
@@ -61,7 +64,7 @@ public:
         
         if (!task_queue_.push( [task]() { (*task)(); } ) )
         {
-            throw std::runtime_error("任务队列已关闭");
+            throw std::runtime_error(kSubmitRejectedMessage);
         }
 
         return fut;

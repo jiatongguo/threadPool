@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <utility>
 namespace tp {
+inline constexpr char kInvalidQueueCapacityMessage[] = "任务队列容量必须大于0";
+
 template<typename T>
 class BlockingQueue
 {
@@ -15,7 +17,7 @@ public:
     {
         if (cap_ == 0)
         {
-            throw std::invalid_argument("队列容量必须大于0");
+            throw std::invalid_argument(kInvalidQueueCapacityMessage);
         }
     }
 
