@@ -94,19 +94,17 @@ private:
         std::function<void()> task;
         while (task_queue_.pop(task))
         {
-            if (immediate_stop_.load(std::memory_order_acquire))
+            // Immediate 模式下，丢弃已出队但尚未执行的任务
+            if(immediate_stop_.load(std::memory_order_acquire))
             {
-                continue;
+                break;
             }
 
             try
             {
-                task();
+               task();
             }
-            catch(...)
-            {
-
-            }
+            catch(...) {}
         }
     }
 private:
